@@ -14,8 +14,6 @@ Usage:
 
 
 
-## ערוך פרוייקט זה ![בניית תג מצב](https://github.com/zivbot/microbit-daily-reminder/workflows/MakeCode/badge.svg)
-
 To edit this repository in MakeCode.
 
 * open [https://makecode.microbit.org/](https://makecode.microbit.org/)
