@@ -1,14 +1,18 @@
 
 > Open this page at [https://zivbot.github.io/microbit-daily-reminder/](https://zivbot.github.io/microbit-daily-reminder/)
 
-## Use as Extension
+A daily reminder microbit.
 
-This repository can be added as an **extension** in MakeCode.
+Usage:
+- On turning on, set time (hours, minutes), and hour of reminder (rounded)
+- Keeps track on time, filling the screen as an hour passes, and scrolling time when hour changes
+- When its time for the reminder, displays a "+" and plays a short sound effect. Keeps playing sound after 10m, and every 30m, except during night hours.
+  Reminder is dismissed by pressing logo
+- To change the time or alert without reseting, press A+B buttons together
 
-* open [https://makecode.microbit.org/](https://makecode.microbit.org/)
-* click on **New Project**
-* click on **Extensions** under the gearwheel menu
-* search for **https://github.com/zivbot/microbit-daily-reminder** and import
+
+
+
 
 ## ערוך פרוייקט זה ![בניית תג מצב](https://github.com/zivbot/microbit-daily-reminder/workflows/MakeCode/badge.svg)
 
