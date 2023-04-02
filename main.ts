@@ -9,7 +9,7 @@ Version 0.1
 const textSpeed = 60
 const timeDisplaySpeed = 150
 
-let alertDuration = 0
+let alertStartMillis = 0
 let currentMillis = 0
 let lastMillis = 0
 let isAlertOn = false
@@ -153,17 +153,11 @@ basic.forever(function () {
         if (hours == alertHour && Math.floor(minutes) == 0 && !(isAlertOn)) {
             // trigger alert
             isAlertOn = true
-            alertDuration = 0
+            alertStartMillis = control.millis() // mark millis time alert was kicked off
+            alertNotificationStage = 0
         }
         if (isAlertOn) {
-            alertDuration += 1
-            /*basic.showLeds(`
-                # # # # #
-                # # # # #
-                # # # # #
-                # # # # #
-                # # # # #
-                `)*/
+            let alertMinutesSinceStarted = Math.floor((alertStartMillis - control.millis())/(1000*60)) // minutes since alert started
             basic.showLeds(`
                 . . # . .
                 . . # . .
@@ -171,11 +165,15 @@ basic.forever(function () {
                 . . # . .
                 . . # . .
                 `)
-            if (alertDuration == 2) {
+            if (alertNotificationStage ==0 && alertMinutesSinceStarted == 2) {
                 soundAlert(1)
-            } else if (alertDuration == 10) {
+                alertNotificationStage = 1
+            } else if (alertNotificationStage == 1 && alertMinutesSinceStarted == 10) {
                 soundAlert(2)
-            } else if (alertDuration > 10 && alertDuration % 30 == 0 && hours > 8 && hours < 20) {
+                alertNotificationStage = 2
+            } else if (alertNotificationStage == 2 &&
+                       alertMinutesSinceStarted % 30 == 0 
+                       && hours > 8 && hours < 20) {
                 // every half hour, but not during night
                 soundAlert(3)
             }
