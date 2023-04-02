@@ -157,12 +157,19 @@ basic.forever(function () {
         }
         if (isAlertOn) {
             alertDuration += 1
+            /*basic.showLeds(`
+                # # # # #
+                # # # # #
+                # # # # #
+                # # # # #
+                # # # # #
+                `)*/
             basic.showLeds(`
+                . . # . .
+                . . # . .
                 # # # # #
-                # # # # #
-                # # # # #
-                # # # # #
-                # # # # #
+                . . # . .
+                . . # . .
                 `)
             if (alertDuration == 2) {
                 soundAlert(1)
@@ -186,10 +193,10 @@ basic.forever(function () {
                     x = Math.floor(b/5)
                     if (b < Math.floor(mapped)) { 
                         // mark all dots as bright, except last one
-                        led.plotBrightness(x, y, 120)
+                        led.plotBrightness(x, y, 5+(b/mapped)*35)
                     }
-                    else // mark last dot according to seconds of current minute
-                        led.plotBrightness(x, y, (mapped-Math.floor(mapped))*120)
+                    else // mark last dot according to part of the last dot
+                        led.plotBrightness(x, y, 5+(mapped-Math.floor(mapped))*35)
                 }           
             }
         }
