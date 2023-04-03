@@ -6,25 +6,57 @@ Setting is done by A, B, and pressing logo to confirm.
 To return to settup mode, press A+B and repeat the setup flow.
 Version 0.1
 */ 
+const isDebugMode = false // when true, speeds up time
+
 const textSpeed = 60
 const timeDisplaySpeed = 150
 
 let alertStartMillis = 0
+let alertNotificationStage = 0
 let currentMillis = 0
 let lastMillis = 0
 let isAlertOn = false
-let minutes = 0
-let mode = 0
-let alertHour = 0
-let hours = 0
+let minutes = (isDebugMode ? 55 : 0)
+let mode = (isDebugMode ? 2 : 0)
+let alertHour = (isDebugMode ? 9 : 15)
+let hours = 8
 let str = ""
-
-alertHour = 15
-hours = 8
 
 startSetup()
 
 
+function startSetup () {
+    basic.showString("SET H", 60)
+    basic.showNumber(hours, textSpeed)
+}
+
+input.onButtonPressed(Button.AB, function () {
+    // if clicked A+B then go back to setting time and alert
+    mode = 0
+    isAlertOn = false
+    startSetup()
+})
+
+function displayTime ( toConsole = false ) {
+    str = "" + hours + ":"
+    if (minutes < 10) {
+        str = "" + str + "0"
+    }
+    str = "" + str + Math.floor(minutes)
+    if (toConsole)
+        console.log(str)
+    else
+        basic.showString(str,timeDisplaySpeed)
+}
+
+function soundAlert (x: number) {
+    for (; x > 0; x-- ) {
+        music.playTone(Note.C4, music.beat(BeatFraction.Eighth))
+        music.playTone(Note.D4, music.beat(BeatFraction.Quarter))
+    }
+}
+
+/****** ACTION HANDLERS ********/
 input.onButtonPressed(Button.A, function () {
     if (mode == 0) {
         // set hours
@@ -46,37 +78,9 @@ input.onButtonPressed(Button.A, function () {
         if (alertHour < 0) {
             alertHour = 23
         }
-        basic.showNumber(alertHour,textSpeed)
+        basic.showNumber(alertHour, textSpeed)
     }
 })
-
-function startSetup () {
-    mode = 0
-    isAlertOn = false
-    basic.showString("SET H", 60)
-    basic.showNumber(hours, textSpeed)
-}
-
-input.onButtonPressed(Button.AB, function () {
-    // if clicked A+B then go back to setting time and alert
-    startSetup()
-})
-
-function displayTime ( ) {
-    str = "" + hours + ":"
-    if (minutes < 10) {
-        str = "" + str + "0"
-    }
-    str = "" + str + Math.floor(minutes)
-    basic.showString(str,timeDisplaySpeed)
-}
-
-function soundAlert (x: number) {
-    for (; x > 0; x-- ) {
-        music.playTone(Note.C4, music.beat(BeatFraction.Eighth))
-        music.playTone(Note.D4, music.beat(BeatFraction.Quarter))
-    }
-}
 input.onButtonPressed(Button.B, function () {
     if (mode == 0) {
         // set hours
@@ -101,32 +105,38 @@ input.onButtonPressed(Button.B, function () {
         basic.showNumber(alertHour, textSpeed)
     }
 })
+
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
-    if (mode == 0) {
-        basic.showString("SET M", textSpeed)
-basic.showNumber(Math.floor(minutes), textSpeed)
-// change mode
+    if (mode == 0) { // Hour has been set, enter set minutes mode
         mode = 1
-    } else if (mode == 1) {
-        basic.showString("SET ALERT", textSpeed)
-basic.showNumber(alertHour, textSpeed)
-// change mode
+        basic.showString("SET M", textSpeed)
+        basic.showNumber(Math.floor(minutes), textSpeed)
+    } else if (mode == 1) { // Minutes has been set, now set alert
         mode = 2
-    } else if (mode == 2) {
-        // in set alert mode
-        // change mode
-        mode = 3
+        basic.showString("SET ALERT", textSpeed)
+        basic.showNumber(alertHour, textSpeed)
+    } else if (mode == 2) { // Alert has been set, now change to operational mode
         // note the millis when clock started, use it to keep track
         lastMillis = control.millis()
-        basic.showIcon(IconNames.Happy)
-        basic.pause(2000)
+        mode = 3
+        basic.showIcon(IconNames.Happy, 500)
+        basic.pause(500)
         basic.clearScreen()
+        
     }
     if (mode == 3 && isAlertOn) {
         isAlertOn = false
-        basic.showIcon(IconNames.Happy)
+        basic.showIcon(IconNames.Happy,500)
+        basic.pause(500)
+        basic.clearScreen()
     }
 })
+
+/* When shaken, show time */
+input.onShake(function () {
+    if (mode == 3) displayTime()
+})
+
 
 /**
  * Main loop: update time display, and check alert status
@@ -137,10 +147,12 @@ basic.forever(function () {
 
         // if timer is on
         // wait one minute
-        basic.pause(1000) //50 // Controls cycle update intervals. default: 1000 (1 sec)
+        let cycleDelay = (isDebugMode ? 20 : 1000);
+        basic.pause(cycleDelay) // Controls cycle update intervals. default: 1000 (1 sec)
         currentMillis = control.millis()
-        minutes += (currentMillis - lastMillis) / 60000; // change to speed up time, default 60000
+        minutes += (currentMillis - lastMillis) / (60 * cycleDelay); // change to speed up time, default 60000
         lastMillis = currentMillis
+        displayTime(true)
         if (minutes >= 60) {
             minutes += 0 - 60
             if (hours < 23) {
@@ -157,7 +169,9 @@ basic.forever(function () {
             alertNotificationStage = 0
         }
         if (isAlertOn) {
-            let alertMinutesSinceStarted = Math.floor((alertStartMillis - control.millis())/(1000*60)) // minutes since alert started
+            let alertMinutesSinceStarted = Math.floor((control.millis()- alertStartMillis ) / (cycleDelay*60)) // minutes since alert started
+            //console.log(alertMinutesSinceStarted+ ", Notification stage:"+ alertNotificationStage)
+            console.log(alertMinutesSinceStarted)
             basic.showLeds(`
                 . . # . .
                 . . # . .
@@ -165,7 +179,7 @@ basic.forever(function () {
                 . . # . .
                 . . # . .
                 `)
-            if (alertNotificationStage ==0 && alertMinutesSinceStarted == 2) {
+            if (alertNotificationStage == 0 && alertMinutesSinceStarted == 2) {
                 soundAlert(1)
                 alertNotificationStage = 1
             } else if (alertNotificationStage == 1 && alertMinutesSinceStarted == 10) {
@@ -184,9 +198,8 @@ basic.forever(function () {
             else {
                 let x = 0, y = 0;
                 let mapped = Math.map(minutes, 0, 59, 0, 24)
-                console.log(mapped)
+
                 for (let b = 0; b <= mapped; b++) {
-                    //console.log("b=" + b)
                     y = 4- (b % 5);
                     x = Math.floor(b/5)
                     if (b < Math.floor(mapped)) { 
@@ -199,8 +212,4 @@ basic.forever(function () {
             }
         }
     }
-})
-
-input.onShake(function () {
-    if (mode == 3) displayTime()
 })
