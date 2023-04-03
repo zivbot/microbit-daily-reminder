@@ -7,6 +7,7 @@ To return to settup mode, press A+B and repeat the setup flow.
 Version 0.1
 */ 
 const isDebugMode = false // when true, speeds up time
+const debugSpeedUp = 30
 
 const textSpeed = 60
 const timeDisplaySpeed = 150
@@ -21,6 +22,7 @@ let mode = (isDebugMode ? 2 : 0)
 let alertHour = (isDebugMode ? 9 : 15)
 let hours = 8
 let str = ""
+let timeSinceLastAlert = 0
 
 startSetup()
 
@@ -147,12 +149,15 @@ basic.forever(function () {
 
         // if timer is on
         // wait one minute
-        let cycleDelay = (isDebugMode ? 20 : 1000);
+        let cycleDelay = (isDebugMode ? (1000 / debugSpeedUp) : 1000);
         basic.pause(cycleDelay) // Controls cycle update intervals. default: 1000 (1 sec)
         currentMillis = control.millis()
-        minutes += (currentMillis - lastMillis) / (60 * cycleDelay); // change to speed up time, default 60000
+        let minutesPassed = (currentMillis - lastMillis) / (60 * cycleDelay)
+        minutes += minutesPassed; // change to speed up time, default 60000
         lastMillis = currentMillis
-        displayTime(true)
+        timeSinceLastAlert += minutesPassed;
+        
+    
         if (minutes >= 60) {
             minutes += 0 - 60
             if (hours < 23) {
@@ -162,12 +167,21 @@ basic.forever(function () {
                 hours = 0
             }
         }
-        if (hours == alertHour && Math.floor(minutes) == 0 && !(isAlertOn)) {
+
+        displayTime(true) // debug: show time in console
+
+        // Check condition for triggering alert 
+        if (hours == alertHour 
+            && Math.floor(minutes) == 0 
+            && !(isAlertOn) 
+            && Math.floor(timeSinceLastAlert) > 0) {
             // trigger alert
             isAlertOn = true
             alertStartMillis = control.millis() // mark millis time alert was kicked off
             alertNotificationStage = 0
+            timeSinceLastAlert = 0 // used to prevent alert from triggering again in the same 0 minute
         }
+
         if (isAlertOn) {
             let alertMinutesSinceStarted = Math.floor((control.millis()- alertStartMillis ) / (cycleDelay*60)) // minutes since alert started
             //console.log(alertMinutesSinceStarted+ ", Notification stage:"+ alertNotificationStage)
