@@ -7,7 +7,7 @@ To return to settup mode, press A+B and repeat the setup flow.
 Version 0.1
 */ 
 const isDebugMode = false // when true, speeds up time
-const debugSpeedUp = 30
+const debugSpeedUp = 60
 
 const textSpeed = 60
 const timeDisplaySpeed = 150
@@ -199,11 +199,15 @@ basic.forever(function () {
             } else if (alertNotificationStage == 1 && alertMinutesSinceStarted == 10) {
                 soundAlert(2)
                 alertNotificationStage = 2
-            } else if (alertNotificationStage == 2 &&
-                       alertMinutesSinceStarted % 30 == 0 
-                       && hours > 8 && hours < 20) {
+                timeSinceLastAlert = 0 // used here to prevent alert from repeating during the same minute
+            } else if (alertNotificationStage == 2 
+                        && alertMinutesSinceStarted % 30 == 0 
+                       && hours > 8 
+                       && hours < 20
+                    && Math.floor(timeSinceLastAlert) > 0) {
                 // every half hour, but not during night
                 soundAlert(3)
+                timeSinceLastAlert = 0
             }
         } else {
             // show time only on round hours
