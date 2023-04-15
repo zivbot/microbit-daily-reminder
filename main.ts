@@ -23,6 +23,7 @@ let alertHour = (isDebugMode ? 9 : 15)
 let hours = 8
 let str = ""
 let timeSinceLastAlert = 0
+let displayBusy = false
 
 startSetup()
 
@@ -44,7 +45,7 @@ function displayTime ( toConsole = false ) {
     if (toConsole)
         console.log(s)
     else
-        basic.showString(s,timeDisplaySpeed)
+        pauseAndShowString(s)
 }
 
 function formatTime ( hours : number, minutes : number ) {
@@ -61,6 +62,14 @@ function soundAlert (x: number) {
         music.playTone(Note.C4, music.beat(BeatFraction.Eighth))
         music.playTone(Note.D4, music.beat(BeatFraction.Quarter))
     }
+}
+
+function pauseAndShowString(str: string) {
+    if (displayBusy) return;
+    displayBusy = true;
+    basic.showString(str, timeDisplaySpeed);
+    basic.pause(str.length * timeDisplaySpeed)
+    displayBusy = false;
 }
 
 /****** ACTION HANDLERS ********/
@@ -133,6 +142,7 @@ input.onLogoEvent(TouchButtonEvent.Pressed, function () {
     }
     if (mode == 3 && isAlertOn) {
         isAlertOn = false
+        
         basic.showIcon(IconNames.Happy,500)
         basic.pause(500)
         basic.clearScreen()
@@ -143,13 +153,16 @@ input.onLogoEvent(TouchButtonEvent.Pressed, function () {
 input.onShake(function () {
     if (mode == 3) {
         let s = "ALERT=" + formatTime(alertHour, 0)
-        basic.showString(s, timeDisplaySpeed)
+        pauseAndShowString(s)
+        
     }
 })
 /* On loud sound, display time */
 input.onSound(DetectedSound.Loud, function() {
     if (mode == 3) displayTime()
 })
+
+
 
 /**
  * Main loop: update time display, and check alert status
@@ -197,13 +210,14 @@ basic.forever(function () {
             let alertMinutesSinceStarted = Math.floor((control.millis()- alertStartMillis ) / (cycleDelay*60)) // minutes since alert started
             //console.log(alertMinutesSinceStarted+ ", Notification stage:"+ alertNotificationStage)
             console.log(alertMinutesSinceStarted)
-            basic.showLeds(`
-                . . # . .
-                . . # . .
-                # # # # #
-                . . # . .
-                . . # . .
-                `)
+            if (!displayBusy)
+                basic.showLeds(`
+                    . . # . .
+                    . . # . .
+                    # # # # #
+                    . . # . .
+                    . . # . .
+                    `)
             if (alertNotificationStage == 0 && alertMinutesSinceStarted == 2) {
                 soundAlert(1)
                 alertNotificationStage = 1
@@ -222,22 +236,27 @@ basic.forever(function () {
             }
         } else {
             // show time only on round hours
-            if (isHourChanged)
-                displayTime()
+            if (isHourChanged) {
+                if (!displayBusy) {
+                    displayTime()
+                }
+            }
             else {
                 let x = 0, y = 0;
                 let mapped = Math.map(minutes, 0, 59, 0, 24)
 
-                for (let b = 0; b <= mapped; b++) {
-                    y = 4- (b % 5);
-                    x = Math.floor(b/5)
-                    if (b < Math.floor(mapped)) { 
-                        // mark all dots as bright, except last one
-                        led.plotBrightness(x, y, 5+(b/mapped)*35)
+                if (!displayBusy) {
+                    for (let b = 0; b <= mapped; b++) {
+                        y = 4- (b % 5);
+                        x = Math.floor(b/5)
+                        if (b < Math.floor(mapped)) { 
+                            // mark all dots as bright, except last one
+                            led.plotBrightness(x, y, 5+(b/mapped)*35)
+                        }
+                        else // mark last dot according to part of the last dot
+                            led.plotBrightness(x, y, 5+(mapped-Math.floor(mapped))*35)
                     }
-                    else // mark last dot according to part of the last dot
-                        led.plotBrightness(x, y, 5+(mapped-Math.floor(mapped))*35)
-                }           
+                }  
             }
         }
     }
