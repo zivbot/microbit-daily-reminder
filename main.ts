@@ -40,15 +40,20 @@ input.onButtonPressed(Button.AB, function () {
 })
 
 function displayTime ( toConsole = false ) {
-    str = "" + hours + ":"
+    let s = formatTime(hours, minutes)
+    if (toConsole)
+        console.log(s)
+    else
+        basic.showString(s,timeDisplaySpeed)
+}
+
+function formatTime ( hours : number, minutes : number ) {
+    let str = "" + hours + ":"
     if (minutes < 10) {
         str = "" + str + "0"
     }
     str = "" + str + Math.floor(minutes)
-    if (toConsole)
-        console.log(str)
-    else
-        basic.showString(str,timeDisplaySpeed)
+    return str
 }
 
 function soundAlert (x: number) {
@@ -134,11 +139,17 @@ input.onLogoEvent(TouchButtonEvent.Pressed, function () {
     }
 })
 
-/* When shaken, show time */
+/* When shaken, show alert setting */
 input.onShake(function () {
+    if (mode == 3) {
+        let s = "ALERT=" + formatTime(alertHour, 0)
+        basic.showString(s, timeDisplaySpeed)
+    }
+})
+/* On loud sound, display time */
+input.onSound(DetectedSound.Loud, function() {
     if (mode == 3) displayTime()
 })
-
 
 /**
  * Main loop: update time display, and check alert status
