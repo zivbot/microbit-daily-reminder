@@ -6,42 +6,52 @@ Setting is done by A, B, and pressing logo to confirm.
 To return to settup mode, press A+B and repeat the setup flow.
 Version 0.1
 */ 
-const isDebugMode = false // when true, speeds up time
-const debugSpeedUp = 60
+const isDebugMode = true // when true, speeds up time
+const debugSpeedUp = 180
 
 const textSpeed = 60
 const timeDisplaySpeed = 150
 
-let alertStartMillis = 0
+let lastAlertMillis = 0
+let alertMinutesSinceStarted = 0
 let alertNotificationStage = 0
-let currentMillis = 0
-let lastMillis = 0
+
+let millisWhenTimeSet = 0
+let minutesWhenSet = (isDebugMode ? 55 : 0) // minutes as set by user
+let hoursWhenSet = (isDebugMode ? 14 : 12) // hours as set by user
+
+let currentMinutes = -1
+let currentHours = -1
+
+let previousMinutes = 0
+
 let isAlertOn = false
-let minutes = (isDebugMode ? 55 : 0)
-let mode = (isDebugMode ? 2 : 0)
-let alertHour = (isDebugMode ? 9 : 15)
-let hours = 8
+let mode = 0
+let alertHour = (isDebugMode ? 15 : 15)
 let str = ""
-let timeSinceLastAlert = 0
 let displayBusy = false
 
-startSetup()
+startSetup((isDebugMode ? 2 : 0))
 
 
-function startSetup () {
-    basic.showString("SET H", 60)
-    basic.showNumber(hours, textSpeed)
+function startSetup (setMode : number) {
+    mode = setMode
+    if (mode == 0) {
+        basic.showString("HOURS", 60)
+        if (currentHours >= 0) hoursWhenSet = currentHours;
+        basic.showNumber(hoursWhenSet, textSpeed)
+    }
 }
 
 input.onButtonPressed(Button.AB, function () {
     // if clicked A+B then go back to setting time and alert
     mode = 0
     isAlertOn = false
-    startSetup()
+    startSetup(0)
 })
 
 function displayTime ( toConsole = false ) {
-    let s = formatTime(hours, minutes)
+    let s = formatTime(currentHours, currentMinutes)
     if (toConsole)
         console.log(s)
     else
@@ -58,15 +68,27 @@ function formatTime ( hours : number, minutes : number ) {
 }
 
 function soundAlert (x: number) {
-    for (; x > 0; x-- ) {
+    while (x-- > 0) {
         music.playTone(Note.C4, music.beat(BeatFraction.Eighth))
         music.playTone(Note.D4, music.beat(BeatFraction.Quarter))
     }
 }
 
+function soundConfirmation() {
+    music.playTone(Note.C4, music.beat(BeatFraction.Eighth))
+    music.playTone(Note.D4, music.beat(BeatFraction.Quarter))
+    music.playTone(Note.E4, music.beat(BeatFraction.Eighth))
+    music.playTone(Note.F4, music.beat(BeatFraction.Quarter))
+}
+
+function soundClick() {
+    music.playTone(Note.E4, music.beat(BeatFraction.Sixteenth))
+}
+
 function pauseAndShowString(str: string) {
     if (displayBusy) return;
     displayBusy = true;
+    basic.clearScreen()
     basic.showString(str, timeDisplaySpeed);
     basic.pause(str.length * timeDisplaySpeed)
     displayBusy = false;
@@ -74,20 +96,21 @@ function pauseAndShowString(str: string) {
 
 /****** ACTION HANDLERS ********/
 input.onButtonPressed(Button.A, function () {
+    soundClick()
     if (mode == 0) {
         // set hours
-        hours += -1
-        if (hours < 0) {
-            hours = 23
+        hoursWhenSet += -1
+        if (hoursWhenSet < 0) {
+            hoursWhenSet = 23
         }
-        basic.showNumber(hours, textSpeed)
+        basic.showNumber(hoursWhenSet, textSpeed)
     } else if (mode == 1) {
         // set minutes
-        minutes += 0 - 1
-        if (minutes < 0) {
-            minutes += 60
+        minutesWhenSet += 0 - 1
+        if (minutesWhenSet < 0) {
+            minutesWhenSet += 60
         }
-        basic.showNumber(Math.floor(minutes), textSpeed * 0.7)
+        basic.showNumber(Math.floor(minutesWhenSet), textSpeed * 0.7)
     } else if (mode == 2) {
         // set alert hour
         alertHour += 0 - 1
@@ -98,20 +121,21 @@ input.onButtonPressed(Button.A, function () {
     }
 })
 input.onButtonPressed(Button.B, function () {
+    soundClick()
     if (mode == 0) {
         // set hours
-        hours += 1
-        if (hours > 23) {
-            hours = 0
+        hoursWhenSet += 1
+        if (hoursWhenSet > 23) {
+            hoursWhenSet = 0
         }
-        basic.showNumber(hours, textSpeed)
+        basic.showNumber(hoursWhenSet, textSpeed)
     } else if (mode == 1) {
         // set minutes
-        minutes += 1
-        if (minutes > 60) {
-            minutes += 0 - 60
+        minutesWhenSet += 1
+        if (minutesWhenSet > 60) {
+            minutesWhenSet += 0 - 60
         }
-        basic.showNumber(Math.floor(minutes), textSpeed*0.7)
+        basic.showNumber(Math.floor(minutesWhenSet), textSpeed*0.7)
     } else if (mode == 2) {
         // set alert hours
         alertHour += 1
@@ -125,26 +149,35 @@ input.onButtonPressed(Button.B, function () {
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
     if (mode == 0) { // Hour has been set, enter set minutes mode
         mode = 1
-        basic.showString("SET M", textSpeed)
-        basic.showNumber(Math.floor(minutes), textSpeed)
+        basic.showString("MIN", textSpeed)
+        if (currentMinutes >= 0) minutesWhenSet = currentMinutes;
+        basic.showNumber(minutesWhenSet, textSpeed)
+        soundClick()
     } else if (mode == 1) { // Minutes has been set, now set alert
         mode = 2
-        basic.showString("SET ALERT", textSpeed)
+        basic.showString("ALERT", textSpeed)
         basic.showNumber(alertHour, textSpeed)
+        soundClick()
     } else if (mode == 2) { // Alert has been set, now change to operational mode
         // note the millis when clock started, use it to keep track
-        lastMillis = control.millis()
+        millisWhenTimeSet = control.millis()
+
+        //lastMillis = control.millis()
         mode = 3
         basic.showIcon(IconNames.Happy, 500)
         basic.pause(500)
         basic.clearScreen()
+        soundClick()
         
-    }
-    if (mode == 3 && isAlertOn) {
+    } else if (mode == 3 && isAlertOn) {
+        // Pressed to confirm an alert
+        soundConfirmation()
         isAlertOn = false
         
+        displayBusy = true
         basic.showIcon(IconNames.Happy,500)
         basic.pause(500)
+        displayBusy = false
         basic.clearScreen()
     }
 })
@@ -152,65 +185,74 @@ input.onLogoEvent(TouchButtonEvent.Pressed, function () {
 /* When shaken, show alert setting */
 input.onShake(function () {
     if (mode == 3) {
-        let s = "ALERT=" + formatTime(alertHour, 0)
-        pauseAndShowString(s)
-        
+        displayTime()
     }
 })
-/* On loud sound, display time */
-input.onSound(DetectedSound.Loud, function() {
-    if (mode == 3) displayTime()
-})
 
+/* On loud sound, display time */
+/* DISABLED - causes leds to light up, which cannot be forced off programmatically.
+/*input.onSound(DetectedSound.Loud, function() {
+    if (mode == 3) displayTime()
+})*/
+
+
+/* Calculate currentHours and currentMinutes, based on millisWhenTimeSet, hoursWhenSet & minutesWhenSet */
+function updateCurrentTime() {
+    
+    previousMinutes = currentMinutes // used to note when a rounded hour changes
+
+    let minutesDifference = (control.millis() - millisWhenTimeSet) / (1000 * 60)
+    
+    if (isDebugMode) { // speed things up substantially
+        minutesDifference *= debugSpeedUp
+    }
+
+    currentMinutes = Math.floor((minutesWhenSet + minutesDifference) % 60)
+    
+    let hoursDifference = Math.floor((minutesWhenSet + minutesDifference) / 60)
+    currentHours = (hoursWhenSet + hoursDifference) % 24
+}
 
 
 /**
  * Main loop: update time display, and check alert status
  */
 basic.forever(function () {
-    if (mode == 3) {
+    if (mode == 3) { // Operational mode
         let isHourChanged = false;
 
-        // if timer is on
         // wait one minute
         let cycleDelay = (isDebugMode ? (1000 / debugSpeedUp) : 1000);
         basic.pause(cycleDelay) // Controls cycle update intervals. default: 1000 (1 sec)
-        currentMillis = control.millis()
-        let minutesPassed = (currentMillis - lastMillis) / (60 * cycleDelay)
-        minutes += minutesPassed; // change to speed up time, default 60000
-        lastMillis = currentMillis
-        timeSinceLastAlert += minutesPassed;
-        
+
+        updateCurrentTime()
     
-        if (minutes >= 60) {
-            minutes += 0 - 60
-            if (hours < 23) {
-                hours += 1
-                isHourChanged = true // mark for display of time
-            } else {
-                hours = 0
-            }
-        }
+        isHourChanged = (previousMinutes == 59 && currentMinutes == 0) // Mark to display time every rounded hour
 
         displayTime(true) // debug: show time in console
 
         // Check condition for triggering alert 
-        if (hours == alertHour 
-            && Math.floor(minutes) == 0 
-            && !(isAlertOn) 
-            && Math.floor(timeSinceLastAlert) > 0) {
+        if (currentHours == alertHour
+            && currentMinutes == 0
+            && isHourChanged
+            && !(isAlertOn) ) {
             // trigger alert
             isAlertOn = true
-            alertStartMillis = control.millis() // mark millis time alert was kicked off
             alertNotificationStage = 0
-            timeSinceLastAlert = 0 // used to prevent alert from triggering again in the same 0 minute
+            lastAlertMillis = control.millis()
+            console.log("ALERT")
         }
 
         if (isAlertOn) {
-            let alertMinutesSinceStarted = Math.floor((control.millis()- alertStartMillis ) / (cycleDelay*60)) // minutes since alert started
-            //console.log(alertMinutesSinceStarted+ ", Notification stage:"+ alertNotificationStage)
-            console.log(alertMinutesSinceStarted)
-            if (!displayBusy)
+
+            // count minutes since alert triggered
+            alertMinutesSinceStarted = (control.millis() - lastAlertMillis) / (60 * 1000)
+            if (isDebugMode) { // speed things up substantially
+                alertMinutesSinceStarted *= debugSpeedUp
+            }
+            alertMinutesSinceStarted = Math.floor(alertMinutesSinceStarted)
+
+            if (!displayBusy) {
                 basic.showLeds(`
                     . . # . .
                     . . # . .
@@ -218,21 +260,26 @@ basic.forever(function () {
                     . . # . .
                     . . # . .
                     `)
+            }
+
             if (alertNotificationStage == 0 && alertMinutesSinceStarted == 2) {
                 soundAlert(1)
+                console.log("SOUND 1")
                 alertNotificationStage = 1
+                lastAlertMillis = control.millis()
             } else if (alertNotificationStage == 1 && alertMinutesSinceStarted == 10) {
                 soundAlert(2)
+                console.log("SOUND 2")
                 alertNotificationStage = 2
-                timeSinceLastAlert = 0 // used here to prevent alert from repeating during the same minute
+                lastAlertMillis = control.millis()
             } else if (alertNotificationStage == 2 
-                        && alertMinutesSinceStarted % 30 == 0 
-                       && hours > 8 
-                       && hours < 20
-                    && Math.floor(timeSinceLastAlert) > 0) {
+                        && alertMinutesSinceStarted == 30 
+                        && currentHours > 8 
+                        && currentHours < 20) {
                 // every half hour, but not during night
+                lastAlertMillis = control.millis()
                 soundAlert(3)
-                timeSinceLastAlert = 0
+                console.log("SOUND 3")
             }
         } else {
             // show time only on round hours
@@ -243,9 +290,11 @@ basic.forever(function () {
             }
             else {
                 let x = 0, y = 0;
-                let mapped = Math.map(minutes, 0, 59, 0, 24)
+                let mapped = Math.map(currentMinutes, 0, 59, 0, 24)
 
                 if (!displayBusy) {
+                    // Fill screen with dots according to minutes/60
+                    basic.clearScreen()
                     for (let b = 0; b <= mapped; b++) {
                         y = 4- (b % 5);
                         x = Math.floor(b/5)
