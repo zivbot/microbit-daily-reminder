@@ -6,7 +6,7 @@ Setting is done by A, B, and pressing logo to confirm.
 To return to settup mode, press A+B and repeat the setup flow.
 Version 0.1
 */ 
-const isDebugMode = true // when true, speeds up time
+const isDebugMode = false // when true, speeds up time
 const debugSpeedUp = 180
 
 const textSpeed = 60
@@ -59,12 +59,7 @@ function displayTime ( toConsole = false ) {
 }
 
 function formatTime ( hours : number, minutes : number ) {
-    let str = "" + hours + ":"
-    if (minutes < 10) {
-        str = "" + str + "0"
-    }
-    str = "" + str + Math.floor(minutes)
-    return str
+    return ((hours < 10) ? "0" : "") + hours + ":" + ((minutes < 10) ? "0" : "") + minutes
 }
 
 function soundAlert (x: number) {
@@ -243,7 +238,8 @@ basic.forever(function () {
             console.log("ALERT")
         }
 
-        if (isAlertOn) {
+        if (isAlertOn && currentHours > 8 && currentHours < 20) {
+            // No alerts at night hours!
 
             // count minutes since alert triggered
             alertMinutesSinceStarted = (control.millis() - lastAlertMillis) / (60 * 1000)
@@ -273,9 +269,7 @@ basic.forever(function () {
                 alertNotificationStage = 2
                 lastAlertMillis = control.millis()
             } else if (alertNotificationStage == 2 
-                        && alertMinutesSinceStarted == 30 
-                        && currentHours > 8 
-                        && currentHours < 20) {
+                        && alertMinutesSinceStarted == 30 ) {
                 // every half hour, but not during night
                 lastAlertMillis = control.millis()
                 soundAlert(3)
