@@ -2,9 +2,9 @@
 Daily reminder at a specified hour to do something (e.g. take a pill)
 Use flow:
 After turning on: set hours, minutes, and hour of alert
-Setting is done by A, B, and pressing logo to confirm.
-To return to settup mode, press A+B and repeat the setup flow.
-Version 0.1
+Setting is done by A (+), B (-), and pressing logo to confirm.
+To return to setup mode, press A+B and repeat the setup flow.
+Version 0.2
 */ 
 const isDebugMode = false // when true, speeds up time
 const debugSpeedUp = 180
@@ -18,7 +18,8 @@ let alertNotificationStage = 0
 
 let millisWhenTimeSet = 0
 let minutesWhenSet = (isDebugMode ? 55 : 0) // minutes as set by user
-let hoursWhenSet = (isDebugMode ? 14 : 12) // hours as set by user
+let hoursWhenSet = (isDebugMode ? 17 : 12) // hours as set by user
+let alertHour = (isDebugMode ? 19 : 15)
 
 let currentMinutes = -1
 let currentHours = -1
@@ -27,8 +28,7 @@ let previousMinutes = 0
 
 let isAlertOn = false
 let mode = 0
-let alertHour = (isDebugMode ? 15 : 15)
-let str = ""
+
 let displayBusy = false
 
 startSetup((isDebugMode ? 2 : 0))
@@ -36,6 +36,7 @@ startSetup((isDebugMode ? 2 : 0))
 
 function startSetup (setMode : number) {
     mode = setMode
+    isAlertOn = false
     if (mode == 0) {
         basic.showString("HOURS", 60)
         if (currentHours >= 0) hoursWhenSet = currentHours;
@@ -45,8 +46,6 @@ function startSetup (setMode : number) {
 
 input.onButtonPressed(Button.AB, function () {
     // if clicked A+B then go back to setting time and alert
-    mode = 0
-    isAlertOn = false
     startSetup(0)
 })
 
@@ -91,7 +90,9 @@ function pauseAndShowString(str: string) {
 
 /****** ACTION HANDLERS ********/
 input.onButtonPressed(Button.A, function () {
-    soundClick()
+    if (mode != 3)
+        soundClick()
+        
     if (mode == 0) {
         // set hours
         hoursWhenSet += -1
@@ -116,7 +117,9 @@ input.onButtonPressed(Button.A, function () {
     }
 })
 input.onButtonPressed(Button.B, function () {
-    soundClick()
+    if (mode != 3)
+        soundClick()
+
     if (mode == 0) {
         // set hours
         hoursWhenSet += 1
@@ -142,36 +145,36 @@ input.onButtonPressed(Button.B, function () {
 })
 
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
+    if (mode != 3)
+        soundClick()
+
     if (mode == 0) { // Hour has been set, enter set minutes mode
         mode = 1
         basic.showString("MIN", textSpeed)
         if (currentMinutes >= 0) minutesWhenSet = currentMinutes;
         basic.showNumber(minutesWhenSet, textSpeed)
-        soundClick()
     } else if (mode == 1) { // Minutes has been set, now set alert
         mode = 2
         basic.showString("ALERT", textSpeed)
         basic.showNumber(alertHour, textSpeed)
-        soundClick()
     } else if (mode == 2) { // Alert has been set, now change to operational mode
         // note the millis when clock started, use it to keep track
         millisWhenTimeSet = control.millis()
 
-        //lastMillis = control.millis()
         mode = 3
-        basic.showIcon(IconNames.Happy, 500)
-        basic.pause(500)
-        basic.clearScreen()
-        soundClick()
-        
+        displayBusy = true
+        basic.showIcon(IconNames.Happy, 1000)
+        displayBusy = false
+        //basic.pause(500)
+        //basic.clearScreen()
     } else if (mode == 3 && isAlertOn) {
         // Pressed to confirm an alert
         soundConfirmation()
         isAlertOn = false
         
         displayBusy = true
-        basic.showIcon(IconNames.Happy,500)
-        basic.pause(500)
+        basic.showIcon(IconNames.Happy,1000)
+        //basic.pause(500)
         displayBusy = false
         basic.clearScreen()
     }
@@ -217,7 +220,7 @@ basic.forever(function () {
         let isHourChanged = false;
 
         // wait one minute
-        let cycleDelay = (isDebugMode ? (1000 / debugSpeedUp) : 1000);
+        let cycleDelay = (isDebugMode ? (1000 / 4) : 1000);
         basic.pause(cycleDelay) // Controls cycle update intervals. default: 1000 (1 sec)
 
         updateCurrentTime()
@@ -228,7 +231,7 @@ basic.forever(function () {
 
         // Check condition for triggering alert 
         if (currentHours == alertHour
-            && currentMinutes == 0
+            //&& currentMinutes == 0
             && isHourChanged
             && !(isAlertOn) ) {
             // trigger alert
@@ -238,9 +241,11 @@ basic.forever(function () {
             console.log("ALERT")
         }
 
-        if (isAlertOn && currentHours > 8 && currentHours < 20) {
-            // No alerts at night hours!
+        if (!(currentHours > 8 && currentHours < 20)) {
+            isAlertOn = false; // Cancel alerts at night!
+        }
 
+        if (isAlertOn) {
             // count minutes since alert triggered
             alertMinutesSinceStarted = (control.millis() - lastAlertMillis) / (60 * 1000)
             if (isDebugMode) { // speed things up substantially
@@ -276,13 +281,15 @@ basic.forever(function () {
                 console.log("SOUND 3")
             }
         } else {
-            // show time only on round hours
+            
             if (isHourChanged) {
+                // show the time when hour changes
                 if (!displayBusy) {
                     displayTime()
                 }
             }
             else {
+                // show a dot matrix filling the screen with every hour
                 let x = 0, y = 0;
                 let mapped = Math.map(currentMinutes, 0, 59, 0, 24)
 
